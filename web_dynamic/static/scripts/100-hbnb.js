@@ -1,87 +1,129 @@
+const $ = window.$;
 $(document).ready(function () {
-  let checkedAmenities = {};
-  let checkedStates = {};
-  let checkedCities = {};
-  let checkedLocations = {};
-  $(document).on('change', ".amenities > .popover > li > input[type='checkbox']", function () {
-    if (this.checked) {
-      checkedAmenities[$(this).data('id')] = $(this).data('name');
+  const myAmenities = {};
+  const myStates = {};
+  const myCities = {};
+  let myList = [];
+  const checkbox = $('.amenities input[type="checkbox"]');
+  const checkboxStates = $('.locations .popover li > h2 > input[type="checkbox"]');
+  const checkboxCities = $('.locations .popover li > ul li > input[type="checkbox"]');
+  checkbox.prop('checked', false);
+  checkboxStates.prop('checked', false);
+  checkboxCities.prop('checked', false);
+
+  function checkBoxActions (checkbox, dict, additionalDict = null) {
+    myList = [];
+    const dataId = $(checkbox).attr('data-id');
+    const dataName = $(checkbox).attr('data-name');
+    if (checkbox.checked) {
+      dict[dataId] = dataName;
     } else {
-      delete checkedAmenities[$(this).data('id')];
+      delete (dict[dataId]);
     }
-    let lst = Object.values(checkedAmenities);
-    if (lst.length > 0) {
-      $('div.amenities > h4').text(Object.values(checkedAmenities).join(', '));
-    } else {
-      $('div.amenities > h4').html('&nbsp;');
+    for (const key in dict) {
+      myList.push(dict[key]);
     }
-  });
-  $(document).on('change', ".locations > .popover > li > input[type='checkbox']", function () {
-    if (this.checked) {
-      checkedStates[$(this).data('id')] = $(this).data('name');
-      checkedLocations[$(this).data('id')] = $(this).data('name');
-    } else {
-      delete checkedStates[$(this).data('id')];
-      delete checkedLocations[$(this).data('id')];
-    }
-    let lst = Object.values(checkedLocations);
-    if (lst.length > 0) {
-      $('div.locations > h4').text(lst.join(', '));
-    } else {
-      $('div.locations > h4').html('&nbsp;');
-    }
-  });
-  $(document).on('change', ".locations > .popover > li > ul > li > input[type='checkbox']", function () {
-    if (this.checked) {
-      checkedCities[$(this).data('id')] = $(this).data('name');
-      checkedLocations[$(this).data('id')] = $(this).data('name');
-    } else {
-      delete checkedCities[$(this).data('id')];
-      delete checkedLocations[$(this).data('id')];
-    }
-    let lst = Object.values(checkedLocations);
-    if (lst.length > 0) {
-      $('div.locations > h4').text(lst.join(', '));
-    } else {
-      $('div.locations > h4').html('&nbsp;');
-    }
-  });
-  $.get('http://0.0.0.0:5001/api/v1/status/', function (data, textStatus) {
-    if (textStatus === 'success') {
-      if (data.status === 'OK') {
-        $('#api_status').addClass('available');
-      } else {
-        $('#api_status').removeClass('available');
+    if (additionalDict != null) {
+      for (const key in additionalDict) {
+        myList.push(additionalDict[key]);
       }
     }
+    myList = myList.join(', ');
+    return myList;
+  }
+
+  checkbox.change(function () {
+    myList = checkBoxActions(this, myAmenities);
+    $('div.amenities > h4').text(myList);
   });
-  $.ajax({
-    type: 'POST',
-    url: 'http://0.0.0.0:5001/api/v1/places_search',
-    data: '{}',
-    dataType: 'json',
-    contentType: 'application/json',
-    success: function (data) {
-      for (let i = 0; i < data.length; i++) {
-        let place = data[i];
-        $('.places ').append('<article><h2>' + place.name + '</h2><div class="price_by_night"><p>$' + place.price_by_night + '</p></div><div class="information"><div class="max_guest"><div class="guest_image"></div><p>' + place.max_guest + '</p></div><div class="number_rooms"><div class="bed_image"></div><p>' + place.number_rooms + '</p></div><div class="number_bathrooms"><div class="bath_image"></div><p>' + place.number_bathrooms + '</p></div></div><div class="description"><p>' + place.description + '</p></div></article>');
-      }
+
+  checkboxStates.change(function () {
+    myList = checkBoxActions(this, myStates, myCities);
+    $('div.locations > h4').text(myList);
+  });
+
+  checkboxCities.change(function () {
+    myList = checkBoxActions(this, myCities, myStates);
+    $('div.locations > h4').text(myList);
+  });
+
+  /**
+   * Task 3:
+   * Request http://0.0.0.0:5001/api/v1/status/:
+   * - If in the status is “OK”, add the class available to the DIV#api_status
+   * - Otherwise, remove the class available to the DIV#api_status
+   * **/
+  const apiStatus = $('DIV#api_status');
+  $.ajax('http://0.0.0.0:5001/api/v1/status/').done(function (data) {
+    if (data.status === 'OK') {
+      apiStatus.addClass('available');
+    } else {
+      apiStatus.removeClass('available');
     }
   });
-  $('.filters > button').click(function () {
-    $('.places > article').remove();
-    $.ajax({
-      type: 'POST',
-      url: 'http://0.0.0.0:5001/api/v1/places_search',
-      data: JSON.stringify({'amenities': Object.keys(checkedAmenities), 'states': Object.keys(checkedStates), 'cities': Object.keys(checkedCities)}),
+
+  function search (theAmenities, theStates, theCities) {
+    const datas = {};
+    if (theAmenities != null) {
+      datas.amenities = theAmenities;
+    }
+    if (theStates != null) {
+      datas.states = theStates;
+    }
+    if (theCities != null) {
+      datas.cities = theCities;
+    }
+    const placesSearch = $.ajax({
+      url: 'http://0.0.0.0:5001/api/v1/places_search/',
       dataType: 'json',
       contentType: 'application/json',
-      success: function (data) {
-        for (let i = 0; i < data.length; i++) {
-          let place = data[i];
-          $('.places ').append('<article><h2>' + place.name + '</h2><div class="price_by_night"><p>$' + place.price_by_night + '</p></div><div class="information"><div class="max_guest"><div class="guest_image"></div><p>' + place.max_guest + '</p></div><div class="number_rooms"><div class="bed_image"></div><p>' + place.number_rooms + '</p></div><div class="number_bathrooms"><div class="bath_image"></div><p>' + place.number_bathrooms + '</p></div></div><div class="description"><p>' + place.description + '</p></div></article>');
+      method: 'POST',
+      data: JSON.stringify(datas)
+    });
+    placesSearch.done(function (data) {
+      for (let i = 0; i < data.length; i++) {
+        const placeName = data[i].name;
+        const priceByNight = data[i].price_by_night;
+        const maxGuest = data[i].max_guest;
+        const maxRooms = data[i].number_rooms;
+        const maxBathrooms = data[i].number_bathrooms;
+        const desc = data[i].description;
+        const article = $('<article></article>');
+        const titleBox = $("<div class='title_box'><h2></h2><div class='price_by_night'></div></div>");
+        titleBox.find('> h2').html(placeName);
+        titleBox.find('.price_by_night').html('$' + priceByNight);
+        article.append(titleBox);
+        const information = $("<div class='information'></div>");
+        let guestString = ' Guest';
+        if (maxGuest > 1) {
+          guestString = ' Guests';
         }
+        const guest = $("<div class='max_guest'></div>").html(maxGuest + guestString);
+        information.append(guest);
+        let roomString = ' Bedroom';
+        if (maxRooms > 1) {
+          roomString = ' Bedrooms';
+        }
+        const rooms = $("<div class='number_rooms'></div>").html(maxRooms + roomString);
+        information.append(rooms);
+        let bathString = ' Bathroom';
+        if (maxBathrooms > 1) {
+          bathString = ' Bathrooms';
+        }
+        const bathrooms = $("<div class='number_bathrooms'></div>").html(maxBathrooms + bathString);
+        information.append(bathrooms);
+        article.append(information);
+        const description = $("<div class='description'></div>").html(desc);
+        article.append(description);
+        $('SECTION.places').append(article);
       }
     });
+  }
+
+  search();
+
+  $('.filters > button').click(function () {
+    $('SECTION.places').empty();
+    search(myAmenities, myStates, myCities);
   });
 });
